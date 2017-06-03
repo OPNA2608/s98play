@@ -1,7 +1,10 @@
 ; SB16ŠÖŒW
 
+%ifndef _SOUND_SB16_INC_
+%define _SOUND_SB16_INC_
+
 		; SB16 ‚ðŒ©‚Â‚¯‚é
-FindSB16:	mov	dx, 0x20d2
+SB16Find:	mov	dx, 0x20d2
 .lp1:		call	.check
 		jc	short .found
 		add	dx, byte 2
@@ -23,3 +26,4 @@ FindSB16:	mov	dx, 0x20d2
 		add	cx, byte -1
 .exit:		ret
 
+%endif	; _SOUND_SB16_INC_

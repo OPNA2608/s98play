@@ -39,12 +39,12 @@ ParseOption:	mov	si, 0x80
 		ret
 
 		; É|Å[Égî‘çÜÇìæÇÈ
-OptionPort:	mov	di, ioregisters
+OptionPort:	mov	di, SoundPorts
 .lp:		push	cx
 		call	GetHex16
 		pop	cx
 		jc	short .skip
-		cmp	di, ioregisters + (12 * 2)
+		cmp	di, SoundPorts + (SoundBoardMax * 8)
 		jae	short .skip
 		mov	[di], ax
 		or	byte [options], OPT_DEF_PORT
@@ -62,6 +62,9 @@ OptionWait:	call	GetInt16
 		jc	short .err
 		cmp	ax, byte 1
 		adc	ax, byte 0
-		mov	[wait_count], ax
+		mov	[SoundWaitCount], ax
 		or	byte [options], OPT_DEF_WAIT
 .err:		ret
+
+%include 'misc/GetHex16.inc'
+%include 'misc/GetInt16.inc'
