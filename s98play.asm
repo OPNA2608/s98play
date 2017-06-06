@@ -4,7 +4,8 @@
 
 OPT_DEF_PORT	equ	0x01
 OPT_DEF_WAIT	equ	0x02
-OPT_FLAG_OPL	equ	0x04
+OPT_FLAG_OPN	equ	0x04
+OPT_FLAG_OPL	equ	0x08
 
 %define SoundBoardMax	4
 
@@ -89,8 +90,11 @@ Playing:	cli
 
 		; ボード チェック
 CheckBoards:	xor	bx, bx
+		test	byte [options], OPT_FLAG_OPN
+		jne	short CheckOpnBoards
 		test	byte [options], OPT_FLAG_OPL
 		jne	short CheckOplBoards
+		ret
 
 		; OPN ボード チェック
 CheckOpnBoards:	call	OpnaFind
@@ -134,10 +138,14 @@ CheckOplBoards:	call	SB16Find
 
 		; OPN/OPL をクリア
 ClearBoards:	xor	bx, bx
+		test	byte [options], OPT_FLAG_OPN
+		jne	short .opn
 		test	byte [options], OPT_FLAG_OPL
-		jne	short ClearOPL
-		jmp	SoundClearOpna
-ClearOPL:	jmp	SoundClearOpl3
+		jne	short .opl
+		ret
+
+.opn:		jmp	SoundClearOpna
+.opl:		jmp	SoundClearOpl3
 
 
 ; ---- Sub
@@ -146,24 +154,20 @@ ClearOPL:	jmp	SoundClearOpl3
 S98Check:	call	S98Prepare
 		jc	short .err
 
-		cmp	[si + S98Header.DeviceCount + 0], byte 0
-		je	short .setStartPoint
-		mov	ax, [si + S98Header.DeviceType + 0]
-		cmp	ax, byte 2
-		je	short .setStartPoint
-		cmp	ax, byte 4
-		je	short .setStartPoint
-		cmp	ax, byte 6
-		jb	short .err
-		cmp	ax, byte 9
-		ja	short .err
+		cmp	ax, byte S98OPN
+		je	short .opn
+		cmp	ax, byte S98OPNA
+		je	short .opn
+		cmp	ax, byte S98OPL
+		jb	short .otherModule
+		cmp	ax, byte S98OPL3
+		ja	short .otherModule
 		or	byte [options], OPT_FLAG_OPL
-
-.setStartPoint:	clc
+.otherModule:	clc
 		ret
 
-.err:		stc
-		ret
+.opn:		or	byte [options], OPT_FLAG_OPN
+.err:		ret
 
 MsgNonOpt	db	"Usage: S98PLAY Filename.S98", 13, 10, 36
 MsgInvalidOpt	db	"Invalid options.", 13, 10, 36

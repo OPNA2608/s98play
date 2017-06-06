@@ -110,14 +110,16 @@ s98_getdelta:	xor	cx, cx
 
 
 		; 再生準備
-S98Prepare:	cmp	word [si + S98Header.Magic + 0], 0x3953		; 'S9'
+S98Prepare:	cmp	byte [si + S98Header.Magic + 0], 'S'
 		jne	short .err
-		cmp	word [si + S98Header.Magic + 2], 0x3338		; '83'
+		cmp	word [si + S98Header.Magic + 1], 0x3839		; '98'
+		jne	short .err
+		call	S98GetVersion
 		jne	short .err
 		mov	[cs:s98_dataaddr + 0], si
 		mov	[cs:s98_dataaddr + 2], ds
 		xor	bx, bx
-		call	s98_device
+		call	S98GetDevice
 		clc
 		ret
 .err:		stc
@@ -125,7 +127,20 @@ S98Prepare:	cmp	word [si + S98Header.Magic + 0], 0x3953		; 'S9'
 
 
 		; デバイス情報
-s98_device:	mov	ax, [si + S98Header.DeviceCount]
+S98GetVersion:	mov	al, [si + S98Header.FormatVersion]
+		sub	al, '0'
+		cmp	al, 1
+		je	short .exit
+		cmp	al, 3
+.exit:		ret
+
+
+		; デバイス情報
+S98GetDevice:	call	S98GetVersion
+		cmp	al, 1
+		je	short .default
+
+		mov	ax, [si + S98Header.DeviceCount]
 		shl	ax, 4
 		je	short .default
 
@@ -133,7 +148,7 @@ s98_device:	mov	ax, [si + S98Header.DeviceCount]
 		add	bx, bx
 		cmp	bx, ax
 		sbb	ax, ax
-		and	ax, [si + S98Header.DeviceType]
+		and	ax, [si + bx + S98Header.DeviceType]
 		pop	bx
 		ret
 
