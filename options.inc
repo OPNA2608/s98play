@@ -32,39 +32,60 @@ ParseOption:	mov	si, 0x80
 		and	al, ~0x20
 		cmp	al, 'P'
 		je	short OptionPort
+		cmp	al, 'S'
+		je	short OptionSoftWait
 		cmp	al, 'W'
 		je	short OptionWait
 		stc
 .catch:		jnc	short .lp
 		ret
 
-		; ポート番号を得る
-OptionPort:	mov	di, SoundPorts
-.lp:		push	cx
-		call	GetHex16
-		pop	cx
-		jc	short .skip
-		cmp	di, SoundPorts + (SoundBoardMax * 8)
-		jae	short .skip
-		mov	[di], ax
-		or	byte [options], OPT_DEF_PORT
-.skip:		add	di, byte 2
-		lodsb
-		cmp	al, ','
-		je	short .lp
-		dec	si
-		cmp	al, ' ' + 1
-		cmc
+		; ソフトウェイト
+OptionSoftWait:	or	byte [options], OPT_FLAG_SWAIT
 		ret
 
+		; ポート番号を得る
+OptionPort:	or	byte [options], OPT_DEF_PORT
+		mov	di, SoundPorts
+.lp:		call	GetHex16
+		jc	short .skipaddr
+		mov	[di + SoundPort.Addr], ax
+.skipaddr:	call	optioniscomma
+		jne	short .error
+		call	GetHex16
+		jc	short .skipdata
+		mov	[di + SoundPort.Data], ax
+.skipdata:	call	optioniscomma
+		jne	short .exit
+		add	di, byte SoundPort_size
+		cmp	di, SoundPorts + (SoundBoardMax * 2 * SoundPort_size)
+		jc	short .lp
+.error:		stc
+.exit:		ret
+
 		; ウェイト値を得る
-OptionWait:	call	GetInt16
-		jc	short .err
-		cmp	ax, byte 1
-		adc	ax, byte 0
-		mov	[SoundWaitCount], ax
-		or	byte [options], OPT_DEF_WAIT
-.err:		ret
+OptionWait:	or	byte [options], OPT_DEF_WAIT
+		call	GetInt16
+		jc	short .addr
+		mov	[SoundDataWait], ax
+		mov	dx, 65536 * 17 / 83
+		mul	dx
+		mov	[SoundAddrWait], dx
+.addr:		call	optioniscomma
+		jne	short .exit
+		call	GetInt16
+		jc	short .exit
+		mov	[SoundAddrWait], ax
+.exit:		ret
+
+		; カンマかどうか
+optioniscomma:	lodsb
+		cmp	al, ','
+		je	short .exit
+		cmp	al, ' ' + 1
+		cmc
+		dec	si
+.exit:		ret
 
 %include 'misc/GetHex16.inc'
 %include 'misc/GetInt16.inc'

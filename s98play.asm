@@ -4,8 +4,12 @@
 
 OPT_DEF_PORT	equ	0x01
 OPT_DEF_WAIT	equ	0x02
-OPT_FLAG_OPN	equ	0x04
-OPT_FLAG_OPL	equ	0x08
+OPT_FLAG_SWAIT	equ	0x04
+OPT_FLAG_OPNB	equ	0x08
+OPT_FLAG_OPN	equ	0x10
+OPT_FLAG_OPL	equ	0x20
+OPT_FLAG_OPM	equ	0x40
+OPT_FLAG_OPLL	equ	0x80
 
 %define SoundBoardMax	4
 
@@ -15,19 +19,22 @@ OPT_FLAG_OPL	equ	0x08
 
 options		db	0
 
-dataoff		dw	0
-dataseg		dw	0
+data_addr	dw	0, 0
 
 ; ---- メイン
 
 Main:		cld
+		mov	[data_addr + 2], cs
+
 		; メモリ アドレス設定
 		mov	ax, EndOfProgram + 512
 		add	ax, byte 15
 		and	ax, byte 0xfff0
 		mov	sp, ax
-		mov	[dataoff], sp
-		mov	[dataseg], cs
+		dec	ax
+		shr	ax, 4
+		inc	ax
+		add	[data_addr + 2], ax
 
 		call	ParseOption
 		mov	dx, MsgInvalidOpt
@@ -37,29 +44,33 @@ Main:		cld
 		je	short .err
 
 		; ファイル読み込み
-		mov	si, bx
-		call	S98AddExt
-
-		push	ds
-		lds	dx, [dataoff]
-		call	FileRead
-		pop	ds
-		mov	dx, MsgReaderr
+		call	S98Read
 		jc	short .err
 
 		; S98 チェック
 		push	ds
-		lds	si, [dataoff]
-		call	S98Check
+		lds	si, [data_addr]
+		call	S98Prepare
 		pop	ds
+		jnc	short ChipSelect
 		mov	dx, MsgInvalidS98
-		jnc	short SetPorts
 
 .err:		mov	ah, 9
 		int	0x21
-		mov	ax, 0x4c00
+		mov	ax, 0x4c01
 		int	0x21
 
+ChipSelect:	call	S98Chip
+
+		; ウェイト セットアップ
+SetWait:	test	byte [options], OPT_FLAG_SWAIT
+		jne	short .waitset
+		call	HasHardwareWait
+		jne	short .waited
+.waitset:	call	SoundPortWaitSetup
+.waited:
+
+		; ボード判定
 SetPorts:	test	byte [options], OPT_DEF_PORT
 		jne	short Playing
 		call	CheckBoards
@@ -68,18 +79,15 @@ Playing:	cli
 		call	S98Play
 		sti
 
-.lp:		cmp	byte [cs:S98EndOfData], 0
-		jne	short .ed
-		hlt
-		hlt
-		hlt
-		hlt
+.lp:		hlt
+		cmp	byte [S98EndOfData], 0
+		jne	short .exit
 		mov	ah, 0x06
 		mov	dl, 0xff
 		int	0x21
 		je	short .lp
 
-.ed:		cli
+.exit:		cli
 		call	S98Stop
 		call	ClearBoards
 		call	Ymf297Reset
@@ -87,6 +95,9 @@ Playing:	cli
 
 		mov	ax, 0x4c00
 		int	0x21
+
+
+; ---- Boards
 
 		; ボード チェック
 CheckBoards:	xor	bx, bx
@@ -116,7 +127,6 @@ PrintBoardFound:push	ax
 		stc
 		ret
 
-
 		; OPL ボード チェック
 CheckOplBoards:	call	SB16Find
 		jc	short .sb16
@@ -138,40 +148,127 @@ CheckOplBoards:	call	SB16Find
 
 		; OPN/OPL をクリア
 ClearBoards:	xor	bx, bx
-		test	byte [options], OPT_FLAG_OPN
+		mov	al, [options]
+		test	al, OPT_FLAG_OPN
 		jne	short .opn
-		test	byte [options], OPT_FLAG_OPL
+		test	al, OPT_FLAG_OPL
 		jne	short .opl
+		test	al, OPT_FLAG_OPM
+		jne	short .opm
+		test	al, OPT_FLAG_OPLL
+		jne	short .opll
 		ret
 
 .opn:		jmp	SoundClearOpna
 .opl:		jmp	SoundClearOpl3
+.opm:		jmp	SoundClearOpm
+.opll:		jmp	SoundClearOpll
 
 
 ; ---- Sub
 
-		; S98のチェック
-S98Check:	call	S98Prepare
-		jc	short .err
+		; S98ロード
+S98Read:	call	.open
+		jnc	short .opened
+		mov	si, bx
+		call	S98AddExt
+		call	.open
+		mov	dx, MsgOpenErr
+		jc	short .exit
+.opened:	mov	bx, ax
 
-		cmp	ax, byte S98OPN
-		je	short .opn
-		cmp	ax, byte S98OPNA
-		je	short .opn
-		cmp	ax, byte S98OPL
-		jb	short .otherModule
-		cmp	ax, byte S98OPL3
-		ja	short .otherModule
-		or	byte [options], OPT_FLAG_OPL
-.otherModule:	clc
+		call	FileGetSize
+		add	ax, byte 15
+		adc	dx, byte 0
+		call	ShrDAx4
+		test	dx, dx
+		jne	short .toolarge
+		mov	dx, [2]
+		sub	dx, [data_addr + 2]
+		cmp	dx, ax
+		jnc	short .read
+.toolarge:	mov	dx, MsgTooLargeErr
+		stc
+		jmp	short .close
+
+.read:		push	ds
+		lds	dx, [data_addr]
+		call	FileReadSub
+		pop	ds
+		mov	dx, MsgReadErr
+
+.close:		pushf
+		mov	ah, 0x3e
+		int	0x21
+		popf
+.exit:		ret
+
+
+.open:		mov	ax, 0x3d00
+		mov	dx, bx
+		int	0x21
 		ret
 
-.opn:		or	byte [options], OPT_FLAG_OPN
-.err:		ret
+
+		; S98のチップテスト
+S98Chip:	cmp	ax, byte S98OPN
+		je	short .opn
+		cmp	ax, byte S98OPNA
+		je	short .opna
+		cmp	ax, byte S98PSG
+		je	short .psg
+		cmp	ax, byte S98OPM
+		je	short .opm
+		cmp	ax, byte S98OPLL
+		je	short .opll
+		cmp	ax, byte S98OPL
+		jb	short .exit
+		cmp	ax, byte S98OPL3
+		jbe	short .opl3
+.exit:		ret
+
+.opna:		call	OpnabDefWait
+.opn:
+.psg:		or	byte [options], OPT_FLAG_OPN
+		ret
+
+.opm:		or	byte [options], OPT_FLAG_OPM
+		ret
+
+.opll:		or	byte [options], OPT_FLAG_OPLL
+		ret
+
+.opl3:		or	byte [options], OPT_FLAG_OPL
+		ret
+
+
+OpnabDefWait:	test	byte [options], OPT_DEF_WAIT
+		jne	short .exit
+		call	SetOpnabWait
+.exit:		ret
+
+%include 'io/HardWait.inc'
+%include 'misc/FileGetSize.inc'
+%include 'misc/FileReadSub.inc'
+%include 'misc/ShrDAx.inc'
+%include 'misc/StoreHex16.inc'
+%include 'sound/ClearOpl3.inc'
+%include 'sound/ClearOpll.inc'
+%include 'sound/ClearOpm.inc'
+%include 'sound/ClearOpna.inc'
+%include 'sound/Opna.inc'
+%include 'sound/PortWait.inc'
+%include 'sound/S98.inc'
+%include 'sound/S98AddExt.inc'
+%include 'sound/Sb16.inc'
+%include 'sound/Ymf297.inc'
+%include 'options.inc'
 
 MsgNonOpt	db	"Usage: S98PLAY Filename.S98", 13, 10, 36
 MsgInvalidOpt	db	"Invalid options.", 13, 10, 36
-MsgReaderr	db	"Couldn't read file.", 13, 10, 36
+MsgOpenErr	db	"Couldn't open file.", 13, 10, 36
+MsgTooLargeErr	db	"File too large.", 13, 10, 36
+MsgReadErr	db	"Couldn't read file.", 13, 10, 36
 MsgInvalidS98	db	"Invalid S98 file.", 13, 10, 36
 
 MsgOPNA		db	"YM2608", 36
@@ -179,16 +276,5 @@ MsgSB16		db	"SOUND Blaster 16", 36
 Msg118		db	"PC-9801-118", 36
 MsgFoundAt	db	" was found at "
 MsgFoundPort	db	"0000.", 13, 10, 36
-
-%include 'misc/FileRead.inc'
-%include 'misc/StoreHex16.inc'
-%include 'sound/ClearOpl3.inc'
-%include 'sound/ClearOpna.inc'
-%include 'sound/Opna.inc'
-%include 'sound/S98.inc'
-%include 'sound/S98AddExt.inc'
-%include 'sound/Sb16.inc'
-%include 'sound/Ymf297.inc'
-%include 'options.inc'
 
 EndOfProgram:

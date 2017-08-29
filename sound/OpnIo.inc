@@ -4,13 +4,14 @@
 ; OPN I/O 関係
 
 		; OPN ウェイト
-OpnWait:	mov	cx, 0x20
-		push	ax
+OpnWait:	push	ax
+		mov	ah, 0x20
 .lp:		out	0x5f, al
 		in	al, dx
 		test	al, al
 		jns	short .exit
-		loop	.lp
+		dec	ah
+		jns	short .lp
 .exit:		pop	ax
 		ret
 
@@ -50,7 +51,7 @@ OpnWaitAndWriteReg:
 		; 割り込み番号を取得
 OpnGetIrq:	call	OpnWait
 		mov	al, 0xff
-		jcxz	.err
+		js	short .err
 		mov	ah, 0x07
 		call	OpnReadData
 		and	al, 0x3f

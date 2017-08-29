@@ -25,7 +25,7 @@ SoundClearOpl3:	mov	ax, 0x00bd
 		add	al, 2
 		cmp	al, 0xf6
 		jc	short .lp2
-		add	bx, byte 4
+		add	bx, byte SoundPort_size
 		ret
 
 %endif	; _SOUND_CLEAROPL3_INC_

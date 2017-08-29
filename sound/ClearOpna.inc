@@ -25,7 +25,7 @@ SoundClearOpna:	mov	ax, 0xbf07
 		inc	ax
 		cmp	al, 0x90
 		jc	short .lp2
-		add	bx, byte 4
+		add	bx, byte SoundPort_size
 		ret
 
 %endif	; _SOUND_CLEAROPNA_INC_

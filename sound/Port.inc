@@ -3,26 +3,33 @@
 
 	align	2
 
-%define SoundWaitCount	(SoundWait + 1)
+%define SoundAddrWait	(SoundSendData.addrwait + 1)	;  4.25us
+%define SoundDataWait	(SoundSendData.datawait + 1)	; 20.75us
 
 %ifndef SoundBoardMax
 %define SoundBoardMax	1
 %endif
 
-SoundPorts	times (SoundBoardMax * 4) dw 0
+SoundPorts	times (SoundBoardMax * 2) dw 0, 0
+
+		struc	SoundPort
+.Addr		resw	1
+.Data		resw	1
+		endstruc
 
 		; OPN/OPL のアドレス/データ セット
-SoundSendData:	mov	dx, [SoundPorts + bx + 0]
+SoundSendData:	mov	dx, [SoundPorts + bx + SoundPort.Addr]
 		test	dx, dx
-		je	short SoundWait.skip
+		je	short .skip
 		out	dx, al
-		call	SoundWait
-		mov	dx, [SoundPorts + bx + 2]
+.addrwait:	mov	cx, 7
+		call	.wait
+		mov	dx, [SoundPorts + bx + SoundPort.Data]
 		xchg	al, ah
 		out	dx, al
 		xchg	al, ah
-
-SoundWait:	mov	cx, 8
+.datawait:	mov	cx, 35
+.wait:		jcxz	.skip
 .lp:		out	0x5f, al
 		loop	.lp
 .skip:		ret
@@ -30,13 +37,13 @@ SoundWait:	mov	cx, 8
 
 		; ポート ストア
 SoundPortSet:	push	ax
-		mov	[SoundPorts + bx + 0], ax
+		mov	[SoundPorts + bx + SoundPort.Addr], ax
 		add	ax, dx
-		mov	[SoundPorts + bx + 2], ax
+		mov	[SoundPorts + bx + SoundPort.Data], ax
 		add	ax, dx
-		mov	[SoundPorts + bx + 4], ax
+		mov	[SoundPorts + bx + SoundPort_size + SoundPort.Addr], ax
 		add	ax, dx
-		mov	[SoundPorts + bx + 6], ax
+		mov	[SoundPorts + bx + SoundPort_size + SoundPort.Data], ax
 		pop	ax
 		ret
 

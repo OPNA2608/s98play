@@ -45,17 +45,20 @@ PitSetInterval:	push	ax
 		xchg	al, ah
 		ret
 
-
-		; システム クロックを得る
-PitGetClock:	push	ds
+		; システム クロック モードを得る
+PitClockMode:	push	ds
 		MOVSEG	ds, 0
-		test	byte [ds:0x0501], 0x80
+		cmp	byte [0x0501], 0x80
 		pop	ds
-		mov	dx, 2457600 >> 16
-		mov	ax, 2457600 & 0xffff
-		je	short .exit
-		mov	dx, 1996800 >> 16
-		mov	ax, 1996800 & 0xffff
-.exit:		ret
+		sbb	ax, ax
+		ret
+
+		; システム クロックを得る (0x1e7800 or 0x258000)
+PitGetClock:	call	PitClockMode
+		xor	dx, dx
+		and	ax, 0x8025 - 0x781e
+		add	ax, 0x781e
+		xchg	al, dl
+		ret
 
 %endif	; _IO_PIT_INC_

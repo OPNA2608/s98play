@@ -139,16 +139,13 @@ S98GetVersion:	mov	al, [si + S98Header.FormatVersion]
 S98GetDevice:	call	S98GetVersion
 		cmp	al, 1
 		je	short .default
-
 		mov	ax, [si + S98Header.DeviceCount]
-		shl	ax, 4
-		je	short .default
+		cmp	bx, ax
+		jae	short .default
 
 		push	bx
-		add	bx, bx
-		cmp	bx, ax
-		sbb	ax, ax
-		and	ax, [si + bx + S98Header.DeviceType]
+		shl	bx, 4
+		mov	ax, [si + bx + S98Header.DeviceType]
 		pop	bx
 		ret
 
