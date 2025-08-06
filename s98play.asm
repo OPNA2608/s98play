@@ -109,11 +109,17 @@ CheckBoards:	xor	bx, bx
 
 		; OPN ボード チェック
 CheckOpnBoards:	call	OpnaFind
-		jc	short .found
+		jc	short .foundOpna
+		call	OpnFind
+		jc	short .foundOpn
 		ret
-.found:		mov	dx, 2
+.foundOpna:		mov	dx, 2
 		call	SoundPortSet
 		mov	dx, MsgOPNA
+		jp	PrintBoardFound
+.foundOpn:		mov	dx, 2
+		call	SoundPortSet
+		mov	dx, MsgOPN
 
 PrintBoardFound:push	ax
 		mov	ah, 9
@@ -271,6 +277,7 @@ MsgTooLargeErr	db	"File too large.", 13, 10, 36
 MsgReadErr	db	"Couldn't read file.", 13, 10, 36
 MsgInvalidS98	db	"Invalid S98 file.", 13, 10, 36
 
+MsgOPN		db	"YM2203", 36
 MsgOPNA		db	"YM2608", 36
 MsgSB16		db	"SOUND Blaster 16", 36
 Msg118		db	"PC-9801-118", 36

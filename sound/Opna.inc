@@ -28,6 +28,17 @@ OpnaIsReady:	mov	ah, 0xff
 		cmp	al, 0xff
 		ret
 
+		; OPN ‚ðŒ©‚Â‚¯‚é
+OpnFind:	mov	dx, 0x0188
+		call	OpnWaitAndReadReg
+		cmp	al, 0xff
+		jnc	short .exit
+.found:	mov	ax, 0x2983
+		call	OpnWriteData
+		mov	ax, dx
+		stc
+.exit:		ret
+
 %include 'sound/OpnIo.inc'
 %include 'sound/Port86.inc'
 
