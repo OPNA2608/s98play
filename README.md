@@ -2,7 +2,7 @@
 
 A fork of [s98play](https://amethyst.yui.ne.jp/svn/nekobus/s98play/) that adds PC-9801-26K / YM2203 hardware support.
 
-See readme.txt for a readme file that's closer to what upstream ships.
+See `readme.txt` for a readme file that's closer to what upstream ships.
 
 ---
 
