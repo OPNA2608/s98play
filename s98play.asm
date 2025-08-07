@@ -75,6 +75,18 @@ SetPorts:	test	byte [options], OPT_DEF_PORT
 		jne	short Playing
 		call	CheckBoards
 
+PrintTitle:	call	S98FindTitle
+		mov	ax, [S98TitlAddrH]
+		cmp	ax, 0
+		jnz	short .hasTitle
+
+		mov	ax, [S98TitlAddrL]
+		cmp	ax, 0
+		jz	short Playing
+
+.hasTitle:
+		call	PrintSongTitle
+
 Playing:	cli
 		call	S98Play
 		sti
@@ -150,6 +162,36 @@ CheckOplBoards:	call	SB16Find
 		call	SoundPortSet
 		mov	dx, Msg118
 		jmp	short PrintBoardFound
+
+
+PrintSongTitle:	mov	ah, 9
+		mov	dx, MsgFoundTitleAt
+		int	0x21
+
+		mov	di, MsgFoundTitleAddr
+		mov	ax, [S98TitlAddrH]
+		call	StoreHex16
+		mov	ax, [S98TitlAddrL]
+		call	StoreHex16
+		mov	ah, 9
+		mov	dx, MsgFoundTitleAddr
+		int	0x21
+
+		mov	ah, 9
+		mov	dx, MsgSongTitle
+		int	0x21
+
+.keepFetching:	call	S98GetTitleChar
+		mov	ah, 2
+		int	0x21
+
+		cmp	dl, 0
+		jne	short .keepFetching
+
+		mov ah, 9
+		mov dx, MsgNewLine
+		int 0x21
+		ret
 
 
 		; OPN/OPL ‚ðƒNƒŠƒA
@@ -283,5 +325,9 @@ MsgSB16		db	"SOUND Blaster 16", 36
 Msg118		db	"PC-9801-118", 36
 MsgFoundAt	db	" was found at "
 MsgFoundPort	db	"0000.", 13, 10, 36
+MsgFoundTitleAt	db	"Found title at offset 0x", '$'
+MsgFoundTitleAddr	db "00000000", 0x0d, 0x0a, '$'
+MsgSongTitle	db	"Title: ", '$'
+MsgNewLine	db	0x0d, 0x0a, '$'
 
 EndOfProgram:

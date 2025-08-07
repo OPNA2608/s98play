@@ -15,6 +15,8 @@ S98Rate		dw	0
 S98IntrCount	dw	0
 S98LoopCount	db	0
 S98EndOfData	db	0
+S98TitlAddrL	dw	0
+S98TitlAddrH	dw	0
 
 %include 'sound/Port.inc'
 
@@ -152,6 +154,75 @@ S98GetDevice:	call	S98GetVersion
 .default:	cmp	bx, byte 1
 		sbb	ax, ax
 		and	ax, byte S98OPNA
+		ret
+
+
+S98FindTitle:	push	ax
+		push	bx
+		push	si
+		push	es
+		les	si, [s98_dataaddr]
+
+		mov	al, [es:si + S98Header.TagOffset + 0]
+		mov	ah, [es:si + S98Header.TagOffset + 1]
+		mov	bl, [es:si + S98Header.TagOffset + 2]
+		mov	bh, [es:si + S98Header.TagOffset + 3]
+
+		cmp	ax, 0
+		jnz	short .someTitle
+
+		cmp	bx, 0
+		jz	short .exit
+
+.someTitle:	push	ax
+		mov	al, [es:si + S98Header.FormatVersion]
+		sub	al, '0'
+		cmp	al, 1
+		je	short .v1Title
+		jmp	short .v3Title
+
+.v1Title: pop ax
+		mov	[S98TitlAddrL], ax
+		mov	[S98TitlAddrH], bx
+		jmp	short .exit
+
+		; TODO: Extract title tag from v3 structure. For now, it seems broken.
+.v3Title:	pop	ax
+
+.exit:		pop	es
+		pop	si
+		pop	bx
+		pop	ax
+		ret
+
+
+S98GetTitleChar:	push	si
+		push	es
+		les	si, [s98_dataaddr]
+
+		push	es
+		pop	ax
+		add	ax, [S98TitlAddrH]
+		push	ax
+		pop	es
+
+		add	si, [S98TitlAddrL]
+
+		mov	dl, [es:si]
+
+		; low
+		mov	ax, [S98TitlAddrL]
+		inc	ax
+		mov	[S98TitlAddrL], ax
+		jnz	short .exit
+
+		; high
+		mov	ax, [S98TitlAddrH]
+		inc	ax
+		mov	[S98TitlAddrH], ax
+
+.exit:		pop	es
+		pop	si
 		ret
 
 
