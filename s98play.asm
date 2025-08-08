@@ -177,10 +177,18 @@ PrintSongTitle:	mov	ah, 9
 		mov	dx, MsgFoundTitleAddr
 		int	0x21
 
+		call	S98GetVersion2
+		jne	short .exit
+
+		cmp	al, 1
+		jne	short .startFetching
+
+		; if v1, it's just title. print info about what the text is
 		mov	ah, 9
 		mov	dx, MsgSongTitle
 		int	0x21
 
+.startFetching:
 .keepFetching:	call	S98GetTitleChar
 		mov	ah, 2
 		int	0x21
@@ -191,7 +199,7 @@ PrintSongTitle:	mov	ah, 9
 		mov ah, 9
 		mov dx, MsgNewLine
 		int 0x21
-		ret
+.exit:		ret
 
 
 		; OPN/OPL ‚ðƒNƒŠƒA

@@ -157,8 +157,32 @@ S98GetDevice:	call	S98GetVersion
 		ret
 
 
+; for use after s98_dataaddr is set up
+S98GetVersion2:	push	si
+		push	es
+		les	si, [s98_dataaddr]
+
+		call	S98GetVersion3
+
+		pop	es
+		pop	si
+		ret
+
+
+; for use with ES:SI set up
+S98GetVersion3:	mov	al, [es:si + S98Header.FormatVersion]
+		sub	al, '0'
+		cmp	al, 1
+		je	short .exit
+		cmp	al, 3
+.exit:		ret
+
+
+; setup S98TitlAddr{L,H} with pointers to start of title data
+; if result is 0000:0000, then either no title data or some kind of error
 S98FindTitle:	push	ax
 		push	bx
+		push	dx
 		push	si
 		push	es
 		les	si, [s98_dataaddr]
@@ -175,53 +199,100 @@ S98FindTitle:	push	ax
 		jz	short .exit
 
 .someTitle:	push	ax
-		mov	al, [es:si + S98Header.FormatVersion]
-		sub	al, '0'
+		call	S98GetVersion3
+		jne	short .exit
 		cmp	al, 1
 		je	short .v1Title
 		jmp	short .v3Title
 
-.v1Title: pop ax
+.v1Title:	pop ax
 		mov	[S98TitlAddrL], ax
 		mov	[S98TitlAddrH], bx
 		jmp	short .exit
 
-		; TODO: Extract title tag from v3 structure. For now, it seems broken.
 .v3Title:	pop	ax
+		; Skip "[S98]"
+		add	ax, 5
+		adc	bx, 0
+		mov	[S98TitlAddrL], ax
+		mov	[S98TitlAddrH], bx
+
+		; if UTF-8 BOM is specified, skip over it
+		call	S98GetTitleChar
+		cmp	dl, 0xEF
+		jne	short .v3UndoSkip2
+
+		call	S98GetTitleChar
+		cmp	dl, 0xBB
+		jne	short .v3UndoSkip1
+
+		call	S98GetTitleChar
+		cmp	dl, 0xBF
+		jne	short .v3Undo
+		jmp	.exit
+
+.v3UndoSub:	mov	ax, [S98TitlAddrL]
+		mov     bx, [S98TitlAddrH]
+		sub	ax, 1
+		sbb	bx, 0
+		mov	[S98TitlAddrL], ax
+		mov	[S98TitlAddrH], bx
+		ret
+
+.v3Undo:	call    .v3UndoSub
+.v3UndoSkip1:	call	.v3UndoSub
+.v3UndoSkip2:	call	.v3UndoSub
 
 .exit:		pop	es
 		pop	si
+		pop	dx
 		pop	bx
 		pop	ax
 		ret
 
 
+; get the next character of the title data
 S98GetTitleChar:	push	si
 		push	es
+		push	bx
 		les	si, [s98_dataaddr]
 
 		push	es
 		pop	ax
-		add	ax, [S98TitlAddrH]
+
+		; file data loaded in 0x8000 byte chunks across multiple segments
+		; segment of data increased by 0x100 per 0x8000
+		; high address = per 0x10000, so shift 1 extra
+		mov	bx, [S98TitlAddrH]
+		shl	bx, 8 + 4
+		add	ax, bx
+
+		; adjust segment according to 0x8000 chunk
+		mov	bx, [S98TitlAddrL]
+		and	bx, 0x8000
+		shr	bx, 4
+		add	ax, bx
+
 		push	ax
 		pop	es
 
-		add	si, [S98TitlAddrL]
+		mov	bx, [S98TitlAddrL]
+		; 0x8000 is max chunk size
+		and	bx, 0x7fff
+		add	si, bx
 
 		mov	dl, [es:si]
 
-		; low
+		; increment title address
+		mov	bx, [S98TitlAddrH]
 		mov	ax, [S98TitlAddrL]
 		inc	ax
+		adc	bx, 0
+		mov	[S98TitlAddrH], bx
 		mov	[S98TitlAddrL], ax
-		jnz	short .exit
 
-		; high
-		mov	ax, [S98TitlAddrH]
-		inc	ax
-		mov	[S98TitlAddrH], ax
-
-.exit:		pop	es
+.exit:		pop	bx
+		pop	es
 		pop	si
 		ret
 
