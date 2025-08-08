@@ -1,0 +1,12 @@
+# EditorConfig is awesome: https://editorconfig.org
+
+root = true
+
+[*]
+# Some files seem to be LF?
+# end_of_line = crlf
+insert_final_newline = true
+
+[*.{asm,inc}]
+indent_style = tab
+indent_size = 8
