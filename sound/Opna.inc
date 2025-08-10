@@ -25,15 +25,23 @@ OpnaFind:	mov	ah, 1
 		; ÇªÇÃÉ|Å[ÉgÇ… OPNA ÇÕÇ†ÇÈ?
 OpnaIsReady:	mov	ah, 0xff
 		call	OpnReadData
-		cmp	al, 0xff
-		ret
+		; expected response of a YM2608, according to https://www.webtech.co.jp/company/doc/undocumented_mem/io_sound.txt
+		cmp	al, 0x01
+		je	short .has2608Value
+
+		clc
+		jmp	short .exit
+
+.has2608Value:	stc
+
+.exit:		ret
 
 		; OPN Çå©Ç¬ÇØÇÈ
 OpnFind:	mov	dx, 0x0188
 		call	OpnWaitAndReadReg
 		cmp	al, 0xff
 		jnc	short .exit
-.found:	mov	ax, 0x2983
+.found:		mov	ax, 0x2983
 		call	OpnWriteData
 		mov	ax, dx
 		stc
