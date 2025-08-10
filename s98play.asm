@@ -188,17 +188,36 @@ PrintSongTitle:	mov	ah, 9
 		mov	dx, MsgSongTitle
 		int	0x21
 
-.startFetching:
+.startFetching:	xor	bl, bl
 .keepFetching:	call	S98GetTitleChar
+
+		cmp	dl, 0
+		je	short .doneFetching
+
+		cmp	dl, 0x0a
+		jne	short .printTitleChar
+
+		; did we print a \r before this \n? if yes, proceed
+		cmp	bl, 0x0d
+		je	short .printTitleChar
+
+		; prepend \r before \n
+		push	dx
+		mov	dl, 0x0d
+		mov	ah, 2
+		int	0x21
+		pop	dx
+
+.printTitleChar	mov	bl, dl	; for detecting \n without preceding \r
 		mov	ah, 2
 		int	0x21
 
 		cmp	dl, 0
 		jne	short .keepFetching
 
-		mov ah, 9
-		mov dx, MsgNewLine
-		int 0x21
+.doneFetching:	mov	ah, 9
+		mov	dx, MsgNewLine
+		int	0x21
 .exit:		ret
 
 
