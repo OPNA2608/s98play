@@ -33,18 +33,41 @@ OpnaIsReady:	mov	ah, 0xff
 		jmp	short .exit
 
 .has2608Value:	stc
-
 .exit:		ret
 
 		; OPN Çå©Ç¬ÇØÇÈ
 OpnFind:	mov	dx, 0x0188
-		call	OpnWaitAndReadReg
-		cmp	al, 0xff
+		call	OpnIsReady
+		jc	short .found
+		dec	dh
+		call	OpnIsReady
+		jc	short .found
+		add	dh, 2
+		call	OpnaIsReady
 		jnc	short .exit
-.found:		mov	ax, 0x2983
-		call	OpnWriteData
-		mov	ax, dx
-		stc
+.found:		mov	ax, dx
+.exit:		ret
+
+		; ÇªÇÃÉ|Å[ÉgÇ… OPN ÇÕÇ†ÇÈ?
+OpnIsReady:	mov	al, 0x00
+		call	OpnWaitAndWriteReg
+
+		; register view set to Channel-A Fine Tune
+		; check if we can write to it and read back the same value
+		mov	ah, 0x99
+		mov	al, ah
+		add	dl, 2
+		call	OpnWaitAndWriteReg
+		call	OpnWaitAndReadReg
+		sub	dl, 2
+		cmp	al, ah
+		je	short .hasSameValue
+
+		clc
+		jmp	short .exit
+
+.hasSameValue:	stc
+
 .exit:		ret
 
 %include 'sound/OpnIo.inc'

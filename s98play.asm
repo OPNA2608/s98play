@@ -125,11 +125,11 @@ CheckOpnBoards:	call	OpnaFind
 		call	OpnFind
 		jc	short .foundOpn
 		ret
-.foundOpna:		mov	dx, 2
+.foundOpna:	mov	dx, 2
 		call	SoundPortSet
 		mov	dx, MsgOPNA
-		jp	PrintBoardFound
-.foundOpn:		mov	dx, 2
+		jmp	PrintBoardFound
+.foundOpn:	mov	dx, 2
 		call	SoundPortSet
 		mov	dx, MsgOPN
 
